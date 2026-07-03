@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "2.1.21"
     kotlin("plugin.serialization") version "2.2.10"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 
 }
 
@@ -35,5 +36,10 @@ java {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
+}
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
+    manifest {
+        attributes["Main-Class"] = "com.example.MainKt"
     }
 }
