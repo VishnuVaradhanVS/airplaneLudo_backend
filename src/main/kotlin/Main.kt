@@ -21,7 +21,6 @@ import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
-import io.ktor.server.routing.host
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
@@ -35,15 +34,15 @@ import kotlinx.serialization.json.Json
 import java.util.concurrent.ConcurrentHashMap
 
 fun main() {
-    val port: Int = 8080
+    val port: Int = System.getenv("PORT")?.toIntOrNull() ?: 10000
     val host: String = "0.0.0.0"
-    startLudoServer(port,host)
+    startLudoServer(port, host)
 }
 
 private var serverEngine: NettyApplicationEngine? = null
 private val gameRooms = ConcurrentHashMap<Int, ActiveRoom>()
 
-fun startLudoServer(port: Int = 8080,host: String) {
+fun startLudoServer(port: Int = 8080, host: String) {
     if (serverEngine != null) return
     serverEngine = embeddedServer(Netty, port = port, host = host) {
         install(WebSockets)
@@ -67,7 +66,7 @@ fun startLudoServer(port: Int = 8080,host: String) {
                             )
                         )
                     } catch (e: Exception) {
-                        println("Failed to send in-game rejection: ${e.localizedMessage}")
+
                     }
                     return@webSocket
                 }
@@ -96,12 +95,10 @@ fun startLudoServer(port: Int = 8080,host: String) {
                 activeRoom.sessions.add(currentSession)
                 activeRoom.roomData =
                     activeRoom.roomData.copy(players = activeRoom.sessions.map { it.player })
-
                 val gamePacket =
                     GamePackets(lobbyAction = LobbyAction.PlayerAck, player = newPlayer)
                 val playerAckResponse = Json.encodeToString(gamePacket)
                 send(Frame.Text(playerAckResponse))
-                println("Player ${newPlayer.name} joined room $incomingRoomId")
                 broadcastRoomState(incomingRoomId)
                 try {
                     for (frame in incoming) {
@@ -165,17 +162,15 @@ fun startLudoServer(port: Int = 8080,host: String) {
                         }
                     }
                 } catch (e: Exception) {
-                    println("Session error in room $incomingRoomId: ${e.localizedMessage}")
+
                 } finally {
                     val activeRoom = gameRooms[incomingRoomId]
                     val leavingPlayer =
                         activeRoom?.roomData?.players?.first { p -> p.id == playerId }
                     leaveGame(incomingRoomId, leavingPlayer!!)
                     activeRoom.sessions.removeIf { it.player.id == playerId }
-                    println("Server Finally: Removed session for player ID $playerId from room $incomingRoomId")
                     if (activeRoom.sessions.isEmpty()) {
                         gameRooms.remove(incomingRoomId)
-                        println("Room $incomingRoomId is empty and has been closed.")
                     } else {
                         activeRoom.roomData = activeRoom.roomData.copy(
                             players = activeRoom.sessions.map { it.player }
@@ -184,6 +179,14 @@ fun startLudoServer(port: Int = 8080,host: String) {
                             val nextHost = activeRoom.roomData.players.first()
                             activeRoom.roomData = activeRoom.roomData.copy(
                                 hostId = nextHost.id
+                            )
+                        }
+                        if (leavingPlayer.id == activeRoom.roomData.game?.currentPlayer?.id) {
+                            val nextPlayer = getNextPlayer(incomingRoomId,leavingPlayer)
+                            activeRoom.roomData = activeRoom.roomData.copy(
+                                game = activeRoom.roomData.game!!.copy(
+                                    currentPlayer = nextPlayer
+                                )
                             )
                         }
                         broadcastRoomState(incomingRoomId)
@@ -764,5 +767,4 @@ fun stopLudoServer() {
     serverEngine?.stop(1000, 2000)
     serverEngine = null
     gameRooms.clear()
-    println("Ludo Game Server stopped and port released.")
 }
