@@ -105,7 +105,6 @@ fun startLudoServer(port: Int = 8080, host: String) {
                         if (frame is Frame.Text) {
                             val jsonState = frame.readText()
                             val gamePacket = Json.decodeFromString<GamePackets>(jsonState)
-                            println(gamePacket.toString())
                             when (gamePacket.lobbyAction) {
                                 LobbyAction.SwapTeam -> {
                                     val player = gamePacket.player
@@ -279,10 +278,7 @@ suspend fun swapTeam(player: Player?, roomId: Int?) {
         activeRoom.roomData = activeRoom.roomData.copy(
             players = activeRoom.sessions.map { it.player }
         )
-        println("Server updated: Player ${matchingSession.player.name} swapped to team ${matchingSession.player.team} in room $roomId")
         broadcastRoomState(roomId)
-    } else {
-        println("Failed to swap team: Player ID ${player.id} not found in Room $roomId")
     }
 }
 
@@ -292,7 +288,6 @@ suspend fun kickPlayer(player: Player?, roomId: Int?) {
     val targetSession = activeRoom.sessions.firstOrNull { it.player.id == player.id }
 
     if (targetSession != null) {
-        println("Server: Forcefully removing player ${targetSession.player.name} from room $roomId")
         activeRoom.sessions.remove(targetSession)
         val updatedPlayerList = activeRoom.sessions
             .map { it.player }
